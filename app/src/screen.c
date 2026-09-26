@@ -7,8 +7,12 @@
 #include "events.h"
 #include "icon.h"
 #include "options.h"
+#include "shortcut_mod.h"
 #include "util/log.h"
 #include "util/sdl.h"
+#ifdef HAVE_MIRROR_FRAME
+# include "sys/macos/mirror_frame.h"
+#endif
 
 #define DISPLAY_MARGINS 96
 
@@ -498,6 +502,7 @@ sc_screen_init(struct sc_screen *screen,
     screen->window_aspect_ratio_lock = params->window_aspect_ratio_lock;
     screen->render_fit = params->render_fit;
     screen->flex_display = params->flex_display;
+    screen->mirror_frame = params->mirror_frame;
 
     screen->bg.r = (params->background_color >> 16) & 0xFF;
     screen->bg.g = (params->background_color >> 8) & 0xFF;
@@ -537,6 +542,13 @@ sc_screen_init(struct sc_screen *screen,
                  sc_orientation_get_name(screen->orientation));
         }
     }
+
+#ifdef HAVE_MIRROR_FRAME
+    if (params->mirror_frame) {
+        // Before the window exists: the frame hooks SDL's window classes
+        sc_mirror_frame_init(sc_shortcut_mods_to_sdl(params->shortcut_mods));
+    }
+#endif
 
     // Always create the window hidden to prevent blinking during initialization
     uint32_t window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
@@ -858,9 +870,23 @@ resize_for_content(struct sc_screen *screen, struct sc_size old_content_size,
 }
 
 static void
+notify_content_size(struct sc_screen *screen, struct sc_size size) {
+#ifdef HAVE_MIRROR_FRAME
+    if (screen->mirror_frame) {
+        sc_mirror_frame_set_content_size(size);
+    }
+#else
+    (void) screen;
+    (void) size;
+#endif
+}
+
+static void
 set_content_size(struct sc_screen *screen, struct sc_size new_content_size,
                  bool resize) {
     assert(screen->video);
+
+    notify_content_size(screen, new_content_size);
 
     if (resize) {
         if (is_windowed(screen)) {
@@ -1019,6 +1045,11 @@ void
 sc_screen_toggle_fullscreen(struct sc_screen *screen) {
     assert(screen->video);
 
+    if (screen->mirror_frame) {
+        // The frame's window has a fixed size and no fullscreen
+        return;
+    }
+
     bool req_fullscreen =
         !(SDL_GetWindowFlags(screen->window) & SDL_WINDOW_FULLSCREEN);
 
@@ -1142,6 +1173,7 @@ sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event) {
             free(size);
             screen->content_size = get_oriented_size(screen->frame_size,
                                                      screen->orientation);
+            notify_content_size(screen, screen->content_size);
             sc_screen_show_initial_window(screen);
 
             if (sc_screen_is_relative_mode(screen)) {

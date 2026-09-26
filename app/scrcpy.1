@@ -329,6 +329,12 @@ The actual alignment will be the maximum of this value and the video codec's ali
 Default is 1.
 
 .TP
+.B \-\-mirror\-frame
+Frame the window as iPhone Mirroring does (macOS only): rounded panel, hover chrome, Edit/View/Device menus, fixed sizes from the View menu. Implies no fullscreen.
+
+The View menu sizes (Larger, Actual Size, Smaller) set the window height to 890, 696 or 471 points whatever the device, snapped to the nearest height at which the device pixels scale to whole points.
+
+.TP
 .BI "\-\-mouse " mode
 Select how to send mouse inputs to the device.
 

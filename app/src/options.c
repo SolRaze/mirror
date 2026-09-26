@@ -88,6 +88,7 @@ const struct scrcpy_options scrcpy_options_default = {
     .key_inject_mode = SC_KEY_INJECT_MODE_MIXED,
     .window_aspect_ratio_lock = true,
     .window_borderless = false,
+    .mirror_frame = false,
     .mipmaps = true,
     .stay_awake = false,
     .force_adb_forward = false,

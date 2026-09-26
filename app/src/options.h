@@ -307,6 +307,7 @@ struct scrcpy_options {
     enum sc_key_inject_mode key_inject_mode;
     bool window_aspect_ratio_lock;
     bool window_borderless;
+    bool mirror_frame;
     bool mipmaps;
     bool stay_awake;
     bool force_adb_forward;

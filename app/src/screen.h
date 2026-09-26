@@ -39,6 +39,7 @@ struct sc_screen {
     bool camera;
     bool window_aspect_ratio_lock;
     bool flex_display;
+    bool mirror_frame;
 
     struct sc_controller *controller;
 
@@ -137,6 +138,7 @@ struct sc_screen_params {
 
     bool window_aspect_ratio_lock;
     bool window_borderless;
+    bool mirror_frame;
 
     enum sc_render_fit render_fit;
     enum sc_orientation orientation;

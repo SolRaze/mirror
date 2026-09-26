@@ -31,6 +31,7 @@ enum {
     OPT_WINDOW_WIDTH,
     OPT_WINDOW_HEIGHT,
     OPT_WINDOW_BORDERLESS,
+    OPT_MIRROR_FRAME,
     OPT_MAX_FPS,
     OPT_DISPLAY_ID,
     OPT_RENDER_DRIVER,
@@ -1023,6 +1024,13 @@ static const struct sc_option options[] = {
         .longopt_id = OPT_WINDOW_BORDERLESS,
         .longopt = "window-borderless",
         .text = "Disable window decorations (display borderless window)."
+    },
+    {
+        .longopt_id = OPT_MIRROR_FRAME,
+        .longopt = "mirror-frame",
+        .text = "Frame the window as iPhone Mirroring does (macOS only): "
+                "rounded panel, hover chrome, Edit/View/Device menus, fixed "
+                "sizes from the View menu. Implies no fullscreen.",
     },
     {
         .longopt_id = OPT_WINDOW_TITLE,
@@ -2651,6 +2659,14 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             case OPT_WINDOW_BORDERLESS:
                 opts->window_borderless = true;
                 break;
+            case OPT_MIRROR_FRAME:
+#ifdef HAVE_MIRROR_FRAME
+                opts->mirror_frame = true;
+                break;
+#else
+                LOGE("--mirror-frame is only supported on macOS");
+                return false;
+#endif
             case OPT_PUSH_TARGET:
                 opts->push_target = optarg;
                 break;
@@ -2987,6 +3003,12 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
         opts->video_playback = false;
         // Controls are still possible, allowing for options like
         // --turn-screen-off
+    }
+
+    if (opts->mirror_frame && (opts->fullscreen || opts->window_borderless)) {
+        LOGE("--mirror-frame is incompatible with -f/--fullscreen and "
+             "--window-borderless");
+        return false;
     }
 
     if (!opts->video) {
