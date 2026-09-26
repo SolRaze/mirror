@@ -99,6 +99,10 @@ else
     ]
     if host_machine.system() == 'darwin'
         feature_test_macros += '-D_DARWIN_C_SOURCE'
+        add_languages('objc', native: false)
+        add_project_arguments('-fobjc-arc', '-D_DARWIN_C_SOURCE',
+                              '-Wno-unused-parameter', language: 'objc')
+        src += [ 'src/sys/macos/mirror_frame.m' ]
     endif
 endif
 
@@ -174,6 +178,10 @@ if usb_support
     dependencies += dependency('libusb-1.0', static: static)
 endif
 
+if host_machine.system() == 'darwin'
+    dependencies += dependency('appleframeworks', modules: ['Cocoa', 'QuartzCore'])
+endif
+
 if host_machine.system() == 'windows'
     dependencies += cc.find_library('mingw32')
     dependencies += cc.find_library('ws2_32')
@@ -230,6 +238,9 @@ conf.set('HAVE_VIDEOTOOLBOX', videotoolbox_support)
 
 # enable HID over AOA support (linux only)
 conf.set('HAVE_USB', usb_support)
+
+# --mirror-frame
+conf.set('HAVE_MIRROR_FRAME', host_machine.system() == 'darwin')
 
 configure_file(configuration: conf, output: 'config.h')
 
