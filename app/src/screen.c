@@ -546,7 +546,8 @@ sc_screen_init(struct sc_screen *screen,
 #ifdef HAVE_MIRROR_FRAME
     if (params->mirror_frame) {
         // Before the window exists: the frame hooks SDL's window classes
-        sc_mirror_frame_init(sc_shortcut_mods_to_sdl(params->shortcut_mods));
+        sc_mirror_frame_init(sc_shortcut_mods_to_sdl(params->shortcut_mods),
+                             params->serial, params->turn_screen_off);
     }
 #endif
 

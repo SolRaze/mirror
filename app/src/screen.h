@@ -139,6 +139,8 @@ struct sc_screen_params {
     bool window_aspect_ratio_lock;
     bool window_borderless;
     bool mirror_frame;
+    const char *serial; // for mirror_frame's adb items
+    bool turn_screen_off;
 
     enum sc_render_fit render_fit;
     enum sc_orientation orientation;

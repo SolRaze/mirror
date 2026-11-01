@@ -778,6 +778,8 @@ aoa_complete:
             .window_aspect_ratio_lock = options->window_aspect_ratio_lock,
             .window_borderless = options->window_borderless,
             .mirror_frame = options->mirror_frame,
+            .serial = serial,
+            .turn_screen_off = options->turn_screen_off,
             .render_fit = options->render_fit,
             .orientation = options->display_orientation,
             .mipmaps = options->mipmaps,

@@ -32,6 +32,7 @@
 #import <objc/runtime.h>
 #include <SDL3/SDL.h>
 
+#include "adb/adb.h"
 #include "util/log.h"
 
 // The tag packs a 32-bit SDL_Keycode in the low bits and the shift flag above
@@ -263,7 +264,125 @@ static NSImage *homeglyph(void) {
 
 @end
 
-@interface ScrcpyMenu : NSObject
+// adb against the mirrored device, through scrcpy's adb: $ADB or adb on PATH.
+// `done` runs on the main thread, `out` takes stdout when given.
+static NSString *serial;
+
+static void adb(NSArray<NSString *> *args, id out, void (^done)(NSTask *task)) {
+    NSString *exe = @(sc_adb_get_executable());
+    NSTask *task = [NSTask new];
+    NSArray *head = serial ? @[@"-s", serial] : @[];
+    if ([exe containsString:@"/"]) {
+        task.executableURL = [NSURL fileURLWithPath:exe];
+    } else {
+        task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/env"];
+        head = [@[exe] arrayByAddingObjectsFromArray:head];
+    }
+    task.arguments = [head arrayByAddingObjectsFromArray:args];
+    task.standardOutput = out ?: NSFileHandle.fileHandleWithNullDevice;
+    task.standardError = NSFileHandle.fileHandleWithNullDevice;
+    task.terminationHandler = ^(NSTask *t) {
+        if (done) {
+            dispatch_async(dispatch_get_main_queue(), ^{ done(t); });
+        }
+    };
+    if (![task launchAndReturnError:nil] && done) {
+        done(nil);
+    }
+}
+
+// A serial with a port or an mDNS service name is a wireless link.
+static BOOL wireless(void) {
+    return [serial containsString:@":"] || [serial containsString:@"._adb._tcp"];
+}
+
+// Device state, read each time the Device menu opens so changes made on the
+// device show. Rotation is `wm user-rotation`'s answer: "lock 0" natural,
+// "lock 1" a quarter turn, "free" auto-rotate. The front app is the top
+// resumed activity's package. Charge limit is LineageOS charging control, in
+// its own provider; elsewhere both its lines come back empty and the item hides.
+static BOOL panellit, touches, chargecap, airplane, wifi, bluetooth;
+static int brightness = -1;
+static NSString *rotation, *frontapp, *caplimit;
+static NSMenu *devicemenu;
+static NSMenuItem *batteryitem, *stopitem, *capitem;
+static NSString *const ROTATIONS[] = {@"lock 0", @"lock 1", @"free"};
+static const int LEVELS[] = {20, 96, 255};
+static NSString *const POWER[] = {@"Reboot", @"Reboot to Recovery", @"Shut Down"};
+
+// One line per value, in this order: show touches, user rotation, front app,
+// battery level, powered count, charge limit on, charge limit percent,
+// brightness, airplane mode, Wi-Fi, Bluetooth.
+static NSString *const STATE =
+    @"lv() { content query --uri content://lineagesettings/system --projection value"
+     " --where \"name='$1'\" 2>/dev/null | sed -n 's/.*value=//p'; };"
+     " settings get system show_touches; wm user-rotation;"
+     " echo \"$(dumpsys activity activities 2>/dev/null"
+     " | sed -n '/topResumedActivity=/{s/.* u[0-9]* \\([^/]*\\)\\/.*/\\1/p;q;}')\";"
+     " dumpsys battery | sed -n 's/^  level: //p'; dumpsys battery | grep -c 'powered: true';"
+     " echo \"$(lv charging_control_enabled)\"; echo \"$(lv charging_control_charging_limit)\";"
+     " settings get system screen_brightness; settings get global airplane_mode_on;"
+     " settings get global wifi_on; settings get global bluetooth_on";
+
+static void readstate(void) {
+    NSPipe *pipe = [NSPipe pipe];
+    adb(@[@"shell", STATE], pipe, ^(NSTask *task) {
+        NSString *text = [[NSString alloc] initWithData:pipe.fileHandleForReading.readDataToEndOfFile
+                                               encoding:NSUTF8StringEncoding];
+        NSArray *lines = [[text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]
+                          componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet];
+        if (lines.count < 11) {
+            return;
+        }
+        NSCharacterSet *space = NSCharacterSet.whitespaceCharacterSet;
+        touches = [lines[0] isEqualToString:@"1"];
+        rotation = [lines[1] stringByTrimmingCharactersInSet:space];
+        frontapp = [lines[2] stringByTrimmingCharactersInSet:space];
+        chargecap = [lines[5] intValue] == 1;
+        caplimit = [lines[6] stringByTrimmingCharactersInSet:space];
+        brightness = [lines[7] intValue];
+        airplane = [lines[8] intValue] == 1;
+        wifi = [lines[9] intValue] == 1;
+        bluetooth = [lines[10] intValue] == 1;
+        stopitem.title = frontapp.length ? [@"Force Stop " stringByAppendingString:frontapp]
+                                         : @"Force Stop App";
+        capitem.hidden = caplimit.length == 0;
+        batteryitem.title = [NSString stringWithFormat:@"Battery %@%%, %@%@",
+                             [lines[3] stringByTrimmingCharactersInSet:space],
+                             [lines[4] intValue] ? @"on power" : @"on battery",
+                             chargecap && caplimit.length
+                                 ? [NSString stringWithFormat:@", held at %@%%", caplimit] : @""];
+        [devicemenu update];
+    });
+}
+
+static void chime(NSTask *task, NSString *sound) {
+    if (task && task.terminationStatus == 0) {
+        [[NSSound soundNamed:sound] play];
+    } else {
+        NSBeep();
+    }
+}
+
+static void lineageput(NSString *name, NSString *value) {
+    adb(@[@"shell", @"content", @"insert", @"--uri", @"content://lineagesettings/system",
+          @"--bind", [@"name:s:" stringByAppendingString:name],
+          @"--bind", [@"value:s:" stringByAppendingString:value]], nil, nil);
+}
+
+static NSMenuItem *submenu(NSMenu *menu, NSString *title, NSString *symbol) {
+    NSMenuItem *holder = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
+    holder.image = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil];
+    holder.submenu = [[NSMenu alloc] initWithTitle:title];
+    [menu addItem:holder];
+    return holder;
+}
+
+static NSControlStateValue checked(BOOL on) {
+    return on ? NSControlStateValueOn : NSControlStateValueOff;
+}
+
+@interface ScrcpyMenu : NSObject <NSMenuDelegate>
 @end
 
 @implementation ScrcpyMenu
@@ -336,7 +455,146 @@ static void fitheight(NSWindow *window) {
 }
 
 // The size the window stands at is dimmed, as in iPhone Mirroring.
+// Device Screen: the screen-off shortcut and its shift form blank and relight
+// the device panel, mirroring on either way. The device reports no panel
+// state, so this is the last one sent, starting from --turn-screen-off. A
+// touch on the device or the Power item relights the panel behind it; the next
+// pick then resends the state already showing, and the one after acts.
+- (void)panel:(id)sender {
+    panellit = !panellit;
+    pushkey(SDLK_O, panellit);
+}
+
+- (void)touches:(id)sender {
+    touches = !touches;
+    adb(@[@"shell", @"settings", @"put", @"system", @"show_touches", touches ? @"1" : @"0"], nil, nil);
+}
+
+- (void)rotate:(NSMenuItem *)item {
+    rotation = ROTATIONS[item.tag];
+    adb([@[@"shell", @"wm", @"user-rotation"]
+         arrayByAddingObjectsFromArray:[rotation componentsSeparatedByString:@" "]], nil, nil);
+}
+
+// Manual mode, then the level: auto-brightness would move it straight back.
+- (void)brightness:(NSMenuItem *)item {
+    brightness = LEVELS[item.tag];
+    adb(@[@"shell", [NSString stringWithFormat:
+          @"settings put system screen_brightness_mode 0; settings put system screen_brightness %d",
+          brightness]], nil, nil);
+}
+
+// The device's own framebuffer at full resolution, not the mirror window.
+- (void)screenshot:(id)sender {
+    NSDateFormatter *format = [NSDateFormatter new];
+    format.dateFormat = @"yyyy-MM-dd 'at' HH.mm.ss";
+    NSString *name = mirror.title.length ? mirror.title : @"scrcpy";
+    NSString *path = [NSString stringWithFormat:@"%@/Downloads/%@ %@.png", NSHomeDirectory(),
+                      name, [format stringFromDate:NSDate.date]];
+    [NSFileManager.defaultManager createFileAtPath:path contents:nil attributes:nil];
+    NSFileHandle *out = [NSFileHandle fileHandleForWritingAtPath:path];
+    adb(@[@"exec-out", @"screencap", @"-p"], out, ^(NSTask *task) {
+        [out closeFile];
+        if (!task || task.terminationStatus != 0) {
+            [NSFileManager.defaultManager removeItemAtPath:path error:nil];
+        }
+        chime(task, @"Grab");
+    });
+}
+
+// .apk installs, anything else lands in the device's Download folder. Not
+// modal: a modal panel would stall SDL's event loop and freeze the mirror.
+- (void)sendfile:(id)sender {
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    panel.allowsMultipleSelection = YES;
+    panel.canChooseDirectories = YES;
+    panel.prompt = @"Send";
+    [panel beginWithCompletionHandler:^(NSModalResponse response) {
+        if (response != NSModalResponseOK) {
+            return;
+        }
+        for (NSURL *url in panel.URLs) {
+            NSArray *args = [url.pathExtension.lowercaseString isEqualToString:@"apk"]
+                ? @[@"install", @"-r", url.path]
+                : @[@"push", url.path, @"/sdcard/Download/"];
+            adb(args, nil, ^(NSTask *task) { chime(task, @"Glass"); });
+        }
+    }];
+}
+
+- (void)forcestop:(id)sender {
+    if (frontapp.length) {
+        adb(@[@"shell", @"am", @"force-stop", frontapp], nil, nil);
+    }
+}
+
+// Charge Limit submenu: tag 0 is Off, any other tag is the percent to hold at.
+- (void)chargecap:(NSMenuItem *)item {
+    chargecap = item.tag != 0;
+    if (chargecap) {
+        caplimit = [NSString stringWithFormat:@"%ld", (long)item.tag];
+        lineageput(@"charging_control_charging_limit", caplimit);
+    }
+    lineageput(@"charging_control_enabled", chargecap ? @"1" : @"0");
+}
+
+- (void)wifi:(id)sender {
+    wifi = !wifi;
+    adb(@[@"shell", @"svc", @"wifi", wifi ? @"enable" : @"disable"], nil, nil);
+}
+
+- (void)bluetooth:(id)sender {
+    bluetooth = !bluetooth;
+    adb(@[@"shell", @"svc", @"bluetooth", bluetooth ? @"enable" : @"disable"], nil, nil);
+}
+
+- (void)airplane:(id)sender {
+    airplane = !airplane;
+    adb(@[@"shell", @"cmd", @"connectivity", @"airplane-mode", airplane ? @"enable" : @"disable"], nil, nil);
+}
+
+// Reboot, Reboot to Recovery, Shut Down, after a confirmation. The mirror ends
+// with the link. A device on USB power may come back up in charge mode after a
+// shutdown rather than stay off.
+- (void)power:(NSMenuItem *)item {
+    NSAlert *alert = [NSAlert new];
+    alert.messageText = [NSString stringWithFormat:@"%@ %@?", POWER[item.tag],
+                         mirror.title.length ? mirror.title : @"the device"];
+    [alert addButtonWithTitle:POWER[item.tag]];
+    [alert addButtonWithTitle:@"Cancel"];
+    alert.buttons.firstObject.hasDestructiveAction = YES;
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+    NSArray *args[] = {@[@"reboot"], @[@"reboot", @"recovery"], @[@"shell", @"reboot", @"-p"]};
+    adb(args[item.tag], nil, nil);
+}
+
+- (void)menuWillOpen:(NSMenu *)menu {
+    readstate();
+}
+
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
+    SEL action = item.action;
+    if (action == @selector(panel:)) {
+        item.state = checked(panellit);
+    } else if (action == @selector(touches:)) {
+        item.state = checked(touches);
+    } else if (action == @selector(rotate:)) {
+        item.state = checked([rotation isEqualToString:ROTATIONS[item.tag]]);
+    } else if (action == @selector(brightness:)) {
+        item.state = checked(brightness == LEVELS[item.tag]);
+    } else if (action == @selector(chargecap:)) {
+        item.state = checked(item.tag ? chargecap && caplimit.intValue == item.tag : !chargecap);
+    } else if (action == @selector(bluetooth:)) {
+        item.state = checked(bluetooth);
+    } else if (action == @selector(wifi:) || action == @selector(airplane:)) {
+        // Both would cut the link a wireless mirror runs on.
+        item.state = checked(action == @selector(wifi:) ? wifi : airplane);
+        return !wireless();
+    } else if (action == @selector(forcestop:)) {
+        return frontapp.length > 0;
+    }
     return item.action != @selector(zoom:) || item.tag != preset
         || fabs(mirror.frame.size.height - fitted) > 0.5;
 }
@@ -685,13 +943,50 @@ static void buildmenus(void) {
     additem(device, @"Hide Notifications", send, TAG(SDLK_N, 1), @"bell.slash", nil, 0);
     [device addItem:[NSMenuItem separatorItem]];
     additem(device, @"Rotate Device", send, TAG(SDLK_R, 0), @"rectangle.portrait.rotate", nil, 0);
+    NSMenu *rotations = submenu(device, @"Rotation Lock", @"lock.rotation").submenu;
+    additem(rotations, @"Natural", @selector(rotate:), 0, @"rectangle.portrait", nil, 0);
+    additem(rotations, @"Quarter Turn", @selector(rotate:), 1, @"rectangle", nil, 0);
+    additem(rotations, @"Auto-Rotate", @selector(rotate:), 2, @"arrow.trianglehead.2.clockwise.rotate.90", nil, 0);
     [device addItem:[NSMenuItem separatorItem]];
     additem(device, @"Volume Up", send, TAG(SDLK_UP, 0), @"speaker.plus", nil, 0);
     additem(device, @"Volume Down", send, TAG(SDLK_DOWN, 0), @"speaker.minus", nil, 0);
     additem(device, @"Power", send, TAG(SDLK_P, 0), @"power", nil, 0);
     [device addItem:[NSMenuItem separatorItem]];
-    additem(device, @"Turn Screen Off", send, TAG(SDLK_O, 0), @"sun.min", nil, 0);
-    additem(device, @"Turn Screen On", send, TAG(SDLK_O, 1), @"sun.max", nil, 0);
+    additem(device, @"Device Screen", @selector(panel:), 0, @"sun.max", nil, 0);
+    additem(device, @"Show Touches", @selector(touches:), 0, @"hand.tap", nil, 0);
+    NSMenu *lights = submenu(device, @"Brightness", @"sun.max.fill").submenu;
+    additem(lights, @"Low", @selector(brightness:), 0, nil, nil, 0);
+    additem(lights, @"Mid", @selector(brightness:), 1, nil, nil, 0);
+    additem(lights, @"High", @selector(brightness:), 2, nil, nil, 0);
+    [device addItem:[NSMenuItem separatorItem]];
+    additem(device, @"Take Screenshot", @selector(screenshot:), 0, @"camera", @"s", CMD);
+    additem(device, @"Send File…", @selector(sendfile:), 0, @"square.and.arrow.up", @"o", CMD);
+    additem(device, @"Force Stop App", @selector(forcestop:), 0, @"xmark.app", nil, 0);
+    stopitem = device.itemArray.lastObject;
+    [device addItem:[NSMenuItem separatorItem]];
+    additem(device, wireless() ? @"Connected over Wi-Fi" : @"Connected over USB", nil, 0,
+            wireless() ? @"wifi" : @"cable.connector", nil, 0);
+    additem(device, @"Battery", nil, 0, @"battery.75percent", nil, 0);
+    batteryitem = device.itemArray.lastObject;
+    capitem = submenu(device, @"Charge Limit", @"battery.100percent.bolt");
+    capitem.hidden = YES;
+    additem(capitem.submenu, @"Off", @selector(chargecap:), 0, nil, nil, 0);
+    [capitem.submenu addItem:[NSMenuItem separatorItem]];
+    for (NSInteger percent = 60; percent <= 90; percent += 10) {
+        additem(capitem.submenu, [NSString stringWithFormat:@"%ld%%", (long)percent],
+                @selector(chargecap:), percent, nil, nil, 0);
+    }
+    additem(device, @"Wi-Fi", @selector(wifi:), 0, @"wifi", nil, 0);
+    additem(device, @"Bluetooth", @selector(bluetooth:), 0, @"dot.radiowaves.left.and.right", nil, 0);
+    additem(device, @"Airplane Mode", @selector(airplane:), 0, @"airplane", nil, 0);
+    [device addItem:[NSMenuItem separatorItem]];
+    NSMenu *power = submenu(device, @"Restart", @"restart").submenu;
+    for (NSInteger i = 0; i < 3; i++) {
+        additem(power, [POWER[i] stringByAppendingString:@"…"], @selector(power:), i, nil, nil, 0);
+    }
+    device.delegate = target;
+    devicemenu = device;
+    readstate();
 
     NSMenu *help = addmenu(bar, @"Help", bar.numberOfItems);
     additem(help, @"scrcpy Help", @selector(help:), 0, nil, @"?", CMD);
@@ -700,8 +995,11 @@ static void buildmenus(void) {
 
 // SDL3 creates its menus inside Cocoa_RegisterApp, during SDL_Init(), and the
 // window later: runs between the two, before SDL builds the window.
-void sc_mirror_frame_init(uint16_t sdl_shortcut_mods) {
+void sc_mirror_frame_init(uint16_t sdl_shortcut_mods, const char *device_serial,
+                          bool turn_screen_off) {
     shortcutmod = sdl_shortcut_mods & -sdl_shortcut_mods;
+    serial = device_serial ? @(device_serial) : nil;
+    panellit = !turn_screen_off;
     target = [ScrcpyMenu new];
     hookgeometry();
     if (!contentrect) {

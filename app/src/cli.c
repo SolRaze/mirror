@@ -1030,7 +1030,10 @@ static const struct sc_option options[] = {
         .longopt = "mirror-frame",
         .text = "Frame the window as iPhone Mirroring does (macOS only): "
                 "rounded panel, hover chrome, Edit/View/Device menus, fixed "
-                "sizes from the View menu. Implies no fullscreen.",
+                "sizes from the View menu. Implies no fullscreen. The Device "
+                "menu also drives the device over adb: screen, brightness, "
+                "rotation lock, screenshot, file send, force stop, radios, "
+                "charge limit (LineageOS) and restart.",
     },
     {
         .longopt_id = OPT_WINDOW_TITLE,

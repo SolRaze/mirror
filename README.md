@@ -10,6 +10,20 @@ menus Edit | View | Device | Help | items send scrcpy shortcuts with the configu
 View sizes Larger | Actual Size | Smaller | window 890 | 696 | 471 pt tall | any device
 fixed size | no fullscreen | no resize edges | tiling window managers keep it at its own size
 
+device menu
+state read over adb each time the menu opens | checkmarks follow changes made on the device
+- Device Screen/ panel off or on, mirroring on | starts from `--turn-screen-off` | a touch on the device relights it unseen
+- Show Touches | Brightness Low 20 | Mid 96 | High 255, manual mode
+- Rotation Lock/ Natural | Quarter Turn | Auto-Rotate | `wm user-rotation`
+- Take Screenshot ⌘S/ device framebuffer | `~/Downloads/<window title> <date>.png`
+- Send File… ⌘O/ `.apk` installs | anything else to `/sdcard/Download`
+- Force Stop/ names the front app's package
+- Connected over USB | Wi-Fi/ from the serial | Battery level | power | held limit
+- Charge Limit/ Off | 60–90% | LineageOS charging control only | hidden elsewhere
+- Wi-Fi | Bluetooth | Airplane Mode/ toggles | Wi-Fi and Airplane greyed on a wireless link
+- Restart/ Reboot | Reboot to Recovery | Shut Down | each confirms
+adb items use `$ADB` or adb on PATH | `-s` the connected serial
+
 devices
 panel height snaps to multiples of `h / gcd(w, h)` | device pixels scale to whole points
 1200x2000 tablet 845 pt | 1080x2400 phone 840 pt | 1920x1080 landscape 846 pt
@@ -19,7 +33,7 @@ capped by the screen's visible frame
 
 files
 - app/src/sys/macos/mirror_frame.m chrome | menus | geometry hooks
-- app/src/screen.c init before window creation | content size to the frame | fullscreen guard
+- app/src/screen.c init before window creation | serial and `--turn-screen-off` to the frame | content size | fullscreen guard
 - app/src/cli.c `--mirror-frame` | rejects `-f` and `--window-borderless`
 
 docs
