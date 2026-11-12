@@ -1,4 +1,4 @@
-scrcpy
+mirror
 
 scrcpy fork | upstream v4.1 | one macOS feature on top | branches `folio` tablet | `pane` headset | same build
 
