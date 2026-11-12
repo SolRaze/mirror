@@ -1,6 +1,6 @@
-folio
+scrcpy
 
-scrcpy fork | upstream v4.1 | one macOS feature on top | branch `folio`
+scrcpy fork | upstream v4.1 | one macOS feature on top | branches `folio` tablet | `pane` headset | same build
 
 mirror frame
 `scrcpy --mirror-frame` | macOS only
@@ -46,7 +46,7 @@ build
 server must match v4.1 | Homebrew's `share/scrcpy/scrcpy-server` does
 
 upstream
-`git remote add upstream https://github.com/Genymobile/scrcpy` | rebase `folio` on the next release tag
+`git remote add upstream https://github.com/Genymobile/scrcpy` | rebase `folio` then `pane` on the next release tag
 
 gotchas
 hooks SDL3's `SDL3Window` and `SDL3Cocoa_WindowListener` by name | missing classes log a warning, window left plain
