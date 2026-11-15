@@ -1,6 +1,6 @@
 mirror
 
-scrcpy fork | upstream v4.1 | one macOS feature on top | branches `folio` tablet | `pane` headset | same build
+scrcpy fork | upstream v5.0.1 | one macOS feature on top | branches `folio` tablet | `pane` headset | same build
 
 mirror frame
 `scrcpy --mirror-frame` | macOS only
@@ -42,8 +42,8 @@ docs
 - FAQ.md upstream faq
 
 build
-`meson setup build --buildtype=release -Dcompile_server=false -Dprebuilt_server=<scrcpy-server v4.1>` | `ninja -C build`
-server must match v4.1 | Homebrew's `share/scrcpy/scrcpy-server` does
+`meson setup build --buildtype=release -Dcompile_server=false -Dprebuilt_server=<scrcpy-server v5.0.1>` | `ninja -C build`
+server must match v5.0.1 | Homebrew's `share/scrcpy/scrcpy-server` does
 
 upstream
 `git remote add upstream https://github.com/Genymobile/scrcpy` | rebase `folio` then `pane` on the next release tag

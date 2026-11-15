@@ -268,7 +268,14 @@ static NSImage *homeglyph(void) {
 // `done` runs on the main thread, `out` takes stdout when given.
 static NSString *serial;
 
+// Bumped by every call without `out`, the writes. readstate drops a result that
+// started before one: a click landing during the read would be undone by it.
+static unsigned writes;
+
 static void adb(NSArray<NSString *> *args, id out, void (^done)(NSTask *task)) {
+    if (!out) {
+        writes++;
+    }
     NSString *exe = @(sc_adb_get_executable());
     NSTask *task = [NSTask new];
     NSArray *head = serial ? @[@"-s", serial] : @[];
@@ -326,7 +333,11 @@ static NSString *const STATE =
 
 static void readstate(void) {
     NSPipe *pipe = [NSPipe pipe];
+    unsigned seen = writes;
     adb(@[@"shell", STATE], pipe, ^(NSTask *task) {
+        if (seen != writes) {
+            return;
+        }
         NSString *text = [[NSString alloc] initWithData:pipe.fileHandleForReading.readDataToEndOfFile
                                                encoding:NSUTF8StringEncoding];
         NSArray *lines = [[text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]
