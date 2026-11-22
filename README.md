@@ -13,15 +13,12 @@ fixed size | no fullscreen | no resize edges | tiling window managers keep it at
 device menu
 state read over adb each time the menu opens | checkmarks follow changes made on the device
 - Device Screen/ panel off or on, mirroring on | starts from `--turn-screen-off` | a touch on the device relights it unseen
-- Show Touches | Brightness Low 20 | Mid 96 | High 255, manual mode
-- Rotation Lock/ Natural | Quarter Turn | Auto-Rotate | `wm user-rotation`
+- Brightness/ Low 20 | Mid 96 | High 255, manual mode
 - Take Screenshot ⌘S/ device framebuffer | `~/Downloads/<window title> <date>.png`
 - Send File… ⌘O/ `.apk` installs | anything else to `/sdcard/Download`
 - Force Stop/ names the front app's package
 - Connected over USB | Wi-Fi/ from the serial | Battery level | power | held limit
 - Charge Limit/ Off | 60–90% | LineageOS charging control only | hidden elsewhere
-- Wi-Fi | Bluetooth | Airplane Mode/ toggles | Wi-Fi and Airplane greyed on a wireless link
-- Restart/ Reboot | Reboot to Recovery | Shut Down | each confirms
 adb items use `$ADB` or adb on PATH | `-s` the connected serial
 
 devices
