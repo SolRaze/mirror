@@ -19,6 +19,7 @@ state read over adb each time the menu opens | checkmarks follow changes made on
 - Force Stop/ names the front app's package
 - Connected over USB | Wi-Fi/ from the serial | Battery level | power | held limit
 - Charge Limit/ Off | 60–90% | LineageOS charging control only | hidden elsewhere
+- Switch to USB | Wi-Fi | Extend/ restart the mirror through `~/.config/aerospace/scripts/scrcpy-toggle.sh <window title> usb|wifi`, or stop it and start Extend | shown only when that script exists
 adb items use `$ADB` or adb on PATH | `-s` the connected serial
 
 devices
@@ -40,12 +41,14 @@ docs
 - FAQ.md upstream faq
 
 build
-`meson setup build --buildtype=release -Dcompile_server=false -Dprebuilt_server=<scrcpy-server v5.0.1>` | `ninja -C build`
+`PKG_CONFIG=/opt/homebrew/bin/pkgconf meson setup build --buildtype=release -Dcompile_server=false -Dprebuilt_server=<scrcpy-server v5.0.1>` | `ninja -C build`
 server must match v5.0.1 | Homebrew's `share/scrcpy/scrcpy-server` does
+`PKG_CONFIG` pins Homebrew's | another `pkg-config` first in PATH finds no ffmpeg or libusb
 
 upstream
 `git remote add upstream https://github.com/Genymobile/scrcpy` | rebase `folio` on the next release tag
 
 gotchas
+resize settles 0.5 s = `MIRROR=folio ~/.config/aerospace/scripts/mirror-pin.sh --if-tiled` when present | fits a tiled window's tile
 hooks SDL3's `SDL3Window` and `SDL3Cocoa_WindowListener` by name | missing classes log a warning, window left plain
 run from an app bundle | a bare CLI process gets no menu bar

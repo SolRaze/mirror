@@ -267,6 +267,8 @@ static NSImage *homeglyph(void) {
 // adb against the mirrored device, through scrcpy's adb: $ADB or adb on PATH.
 // `done` runs on the main thread, `out` takes stdout when given.
 static NSString *serial;
+// --window-title, the mark the toggle script launched this mirror under.
+static NSString *mark;
 
 // Bumped by every call without `out`, the writes. readstate drops a result that
 // started before one: a click landing during the read would be undone by it.
@@ -526,6 +528,51 @@ static void fitheight(NSWindow *window) {
     lineageput(@"charging_control_enabled", chargecap ? @"1" : @"0");
 }
 
+// Runs a shell line outside this process: the mirror is torn down under it, and
+// the child is not.
+static void detach(NSString *line) {
+    NSTask *task = [NSTask new];
+    task.executableURL = [NSURL fileURLWithPath:@"/bin/sh"];
+    task.arguments = @[@"-c", [@"PATH=/opt/homebrew/bin:$PATH; " stringByAppendingString:line]];
+    [task launchAndReturnError:nil];
+}
+
+// The launcher that starts and stops a mirror by mark, taking usb|wifi.
+// No such script: the Switch items stay out of the menu.
+static NSString *toggle(void) {
+    return [NSHomeDirectory() stringByAppendingPathComponent:@".config/aerospace/scripts/scrcpy-toggle.sh"];
+}
+
+// Restarts the mirror on the other link.
+- (void)relink:(id)sender {
+    detach([NSString stringWithFormat:@"'%@' %@ stop; exec '%@' %@ %@",
+            toggle(), mark, toggle(), mark, wireless() ? @"usb" : @"wifi"]);
+}
+
+// Hands the device to Extend: the Mac app, then its app on the device.
+- (void)extend:(id)sender {
+    detach([NSString stringWithFormat:@"'%@' %@ stop; open -a Extend;"
+            " adb -s '%@' shell input keyevent KEYCODE_WAKEUP;"
+            " exec adb -s '%@' shell am start -n local.sol.extend/.Main",
+            toggle(), mark, serial, serial]);
+}
+
+// A tiled window's tile is fitted to it by mirror-pin.sh, re-run once a resize
+// settles: a View size or a rotation. No such script: nothing runs.
+- (void)repin {
+    NSString *pin = [NSHomeDirectory() stringByAppendingPathComponent:@".config/aerospace/scripts/mirror-pin.sh"];
+    if (![NSFileManager.defaultManager isExecutableFileAtPath:pin]) {
+        return;
+    }
+    NSMutableDictionary *env = [NSProcessInfo.processInfo.environment mutableCopy];
+    env[@"MIRROR"] = @"folio";
+    NSTask *task = [NSTask new];
+    task.executableURL = [NSURL fileURLWithPath:pin];
+    task.arguments = @[@"--if-tiled"];
+    task.environment = env;
+    [task launchAndReturnError:nil];
+}
+
 - (void)menuWillOpen:(NSMenu *)menu {
     readstate();
 }
@@ -727,6 +774,8 @@ static void installchrome(NSWindow *window, NSView *content, NSView *panel) {
                                                 usingBlock:^(NSNotification *note) {
         round();
         [note.object invalidateShadow];
+        [NSObject cancelPreviousPerformRequestsWithTarget:target selector:@selector(repin) object:nil];
+        [target performSelector:@selector(repin) withObject:nil afterDelay:0.5];
     }];
 
     MirrorStrip *strip = [[MirrorStrip alloc] initWithFrame:NSZeroRect];
@@ -908,6 +957,13 @@ static void buildmenus(void) {
         additem(capitem.submenu, [NSString stringWithFormat:@"%ld%%", (long)percent],
                 @selector(chargecap:), percent, nil, nil, 0);
     }
+    if (serial && mark && [NSFileManager.defaultManager isExecutableFileAtPath:toggle()]) {
+        additem(device, wireless() ? @"Switch to USB" : @"Switch to Wi-Fi", @selector(relink:), 0,
+                @"arrow.left.arrow.right", nil, 0);
+        if ([NSWorkspace.sharedWorkspace URLForApplicationWithBundleIdentifier:@"local.sol.extend"]) {
+            additem(device, @"Switch to Extend", @selector(extend:), 0, @"rectangle.on.rectangle", nil, 0);
+        }
+    }
     device.delegate = target;
     devicemenu = device;
     readstate();
@@ -923,6 +979,9 @@ void sc_mirror_frame_init(uint16_t sdl_shortcut_mods, const char *device_serial,
                           bool turn_screen_off) {
     shortcutmod = sdl_shortcut_mods & -sdl_shortcut_mods;
     serial = device_serial ? @(device_serial) : nil;
+    NSArray *args = NSProcessInfo.processInfo.arguments;
+    NSUInteger at = [args indexOfObject:@"--window-title"];
+    mark = at != NSNotFound && at + 1 < args.count ? args[at + 1] : nil;
     panellit = !turn_screen_off;
     target = [ScrcpyMenu new];
     hookgeometry();
