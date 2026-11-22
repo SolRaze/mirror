@@ -12,7 +12,7 @@ what it is
 run
 - `ex` pill or `open -a Extend` | quit `pkill -x extend` | display exists only while process runs | second launch exits on busy port
 - `adb track-devices` event-driven | reverse `tcp:54400` on one transport, USB when plugged else Wi-Fi | switching removes the old reverse, app reconnects on the new one | transport newly reversed gets `am start -n local.sol.extend/.Main`
-- Wi-Fi/ no device listed = `adb connect` every 10 s, hosts from `~/.config/extend/hosts` in order, mDNS `adb-<serial>._adb._tcp` then tailnet `folio.<tailnet>.ts.net:5555`, not in the repo | `~/.config/extend/serial` USB serial for `carplay.sh` | folio adbd on 5555 from boot | same 20 Mbps stream, rides adb over TCP | Mac socket stays on 127.0.0.1
+- Wi-Fi/ no device listed = `adb connect` every 10 s, hosts from `~/.config/extend/hosts` in order, mDNS `adb-<serial>._adb._tcp` then tailnet `folio.<tailnet>.ts.net:5555`, not in the repo | `~/.config/extend/serial` USB serial for `carplay.sh` | `~/.config/extend` links to gitignored `device/local/`, carried by the `~/Projects` backup | folio adbd on 5555 from boot | same 20 Mbps stream, rides adb over TCP | Mac socket stays on 127.0.0.1
 - capture + encode only while folio app in foreground | app backgrounded = socket closed = zero Mac cost
 - ScreenCaptureKit sends frames on change only | still screen sends nothing
 
