@@ -81,10 +81,12 @@ if 60 < bw < 220 and 60 < bh < 220 and 0.7 < bw / bh < 1.4:
 
 # done = window id the bar is built for. A window without the session toolbar
 # (launcher) returns 0 and is retried after 20s, not every pass. No folio display
-# (Extend quit, tablet off): the window waits where it is until folio returns.
+# (Extend quit, tablet off): the window waits where it is until folio returns,
+# and the bar panels went with the display, so the bar is rebuilt then.
 done= tried=0
 while pgrep -x "CarPlay Simulator" >/dev/null; do
   id=$(aerospace list-windows --all | awk -F' *[|] *' '$2 == "CarPlay Simulator" {print $1; exit}')
+  extended || done=
   if [[ -n $id ]] && extended; then
     mon=$(aerospace list-windows --all --format '%{window-id}|%{monitor-name}' |
       awk -F'|' -v id=$id '$1 == id {print $2}')
