@@ -1,6 +1,6 @@
 mirror
 
-scrcpy fork | upstream v5.0.1 | one macOS feature on top | branches `folio` tablet | `pane` headset | same build
+scrcpy fork | upstream v5.0.1 | one macOS feature on top | `device/` folio tablet tooling
 
 mirror frame
 `scrcpy --mirror-frame` | macOS only
@@ -37,6 +37,7 @@ files
 - app/src/cli.c `--mirror-frame` | rejects `-f` and `--window-borderless`
 
 docs
+- device/ folio tablet | `carplay.md` CarPlay head unit | `extend/extend.md` virtual display
 - SCRCPY.md upstream readme | every stock option
 - doc/ upstream docs | build | connection | control | virtual display
 - FAQ.md upstream faq
@@ -46,7 +47,7 @@ build
 server must match v5.0.1 | Homebrew's `share/scrcpy/scrcpy-server` does
 
 upstream
-`git remote add upstream https://github.com/Genymobile/scrcpy` | rebase `folio` then `pane` on the next release tag
+`git remote add upstream https://github.com/Genymobile/scrcpy` | rebase `folio` on the next release tag
 
 gotchas
 hooks SDL3's `SDL3Window` and `SDL3Cocoa_WindowListener` by name | missing classes log a warning, window left plain

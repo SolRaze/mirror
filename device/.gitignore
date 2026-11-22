@@ -1,0 +1,4 @@
+boot/
+build/
+hs_err_*.log
+.DS_Store

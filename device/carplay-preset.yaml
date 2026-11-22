@@ -1,0 +1,46 @@
+name: folio
+version: 1
+sortID: 3
+displayPanelsConfig:
+  mainDisplayPanel:
+    displayPanelID: DisplayPanel.Main
+    pixelDimensions:
+      width: 1968
+      height: 1104
+  altDisplayPanels: []
+videoStreamsConfig:
+  mainVideoStream:
+    videoStreamID: VideoStream.Main
+    pixelDimensions:
+      width: 1968
+      height: 1104
+    viewAreas:
+    - viewArea:
+        originX: 0
+        originY: 0
+        width: 1968
+        height: 1104
+      safeArea:
+        originX: 0
+        originY: 0
+        width: 1968
+        height: 1104
+    hidConfig:
+      knobSupport: false
+      knobSupportsHomeAndBackButton: false
+      knobSupportsNudge: false
+      touchScreenMode: High Fidelty
+      touchScreenSupportsCancel: true
+      telephonyButtonsSupport: false
+      mediaButtonsSupport: true
+      touchpadSupport: true
+      touchpadButtonsSupport: true
+      dPadSupport: false
+    primaryInput: Touchpad
+  altVideoStreams: []
+accessoryConfig:
+  enablesMainBufferedAudio: true
+  enablesUIAppearance: true
+  enablesMapAppearance: true
+vehicleConfig:
+  removeWidgets: true
