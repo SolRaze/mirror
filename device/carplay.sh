@@ -30,6 +30,11 @@ if ! pgrep -x extend >/dev/null; then
 fi
 # Brought forward every time: the Mac app holds the display open whether or not
 # folio is showing it.
+# A running folio mirror holds the tablet portrait on its launcher; its stop
+# returns rotation and waits for the mirror's teardown.
+~/.config/aerospace/scripts/scrcpy-toggle.sh folio stop >/dev/null 2>&1
+# Landscape even when a mirror's teardown never reached the tablet.
+fadb shell wm user-rotation lock 1
 fadb shell input keyevent KEYCODE_WAKEUP
 fadb shell am start -n local.sol.extend/.Main >/dev/null 2>&1
 for i in {1..30}; do extended && break; sleep 1; done
